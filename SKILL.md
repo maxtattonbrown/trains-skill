@@ -137,9 +137,9 @@ Based on number of intermediate stops:
    ```
 2. Report delayed/cancelled services or "Good service"
 
-### `/trains add {time}` or `/trains add next`
+### `/trains add {time}` or `/trains add next` or `/trains add`
 
-1. Match train by departure time (or first upcoming)
+1. If no time specified, fetch departures and present an **AskUserQuestion** prompt with the top 3-4 options (prioritise fast trains). If a time is given, match by departure time. If `next`, use first upcoming.
 2. Write `.ics` to `/tmp/train-{date}-{time}.ics`:
    ```
    BEGIN:VCALENDAR
@@ -170,7 +170,7 @@ Based on number of intermediate stops:
    The status line script reads this and shows a countdown chip when within `countdown_mins` of departure. Auto-clears after the train departs.
 5. **Return journey offer**: If the added train is home→work (morning commute), offer to add a return:
    - Fetch evening departures from work→home
-   - Show the next 3-4 fast/semi options as a quick pick list
+   - Use **AskUserQuestion** to present the next 3-4 fast/semi options as a pick list (include a "Skip" option)
    - If user picks one, add it to Calendar and save to `~/.claude/trains/return.json` (same format as `next.json`)
    - The status line script checks `return.json` after `next.json` has cleared (outbound departed), so the countdown seamlessly switches to the return train
    - If user declines, skip silently
