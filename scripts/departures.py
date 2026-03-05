@@ -63,6 +63,26 @@ def get_calling_points(service, dest_crs):
     return stops
 
 
+def calc_journey_mins(dep, arr):
+    """Calculate journey time in minutes from HH:MM strings."""
+    try:
+        dh, dm = map(int, dep.split(":"))
+        ah, am = map(int, arr.split(":"))
+        return (ah * 60 + am) - (dh * 60 + dm)
+    except (ValueError, AttributeError):
+        return None
+
+
+def route_type(calling):
+    """Classify route: 'fast' (0 stops), 'semi' (1-3), 'stopping' (4+)."""
+    n = len(calling)
+    if n == 0:
+        return "fast"
+    elif n <= 3:
+        return "semi"
+    return "stopping"
+
+
 def parse_services(data, dest_crs):
     services = data.get("trainServices") or []
     rows = []
@@ -76,10 +96,13 @@ def parse_services(data, dest_crs):
         arr = get_arrival(s, dest_crs)
         status_text, status_type = format_status(std, etd, is_cancelled)
         calling = get_calling_points(s, dest_crs)
+        mins = calc_journey_mins(std, arr)
+        rtype = route_type(calling)
         rows.append({
             "std": std, "arr": arr, "plat": plat,
             "status": status_text, "status_type": status_type,
             "op": op, "op_code": op_code, "calling": calling,
+            "mins": mins, "route_type": rtype,
         })
     return rows
 
@@ -127,69 +150,82 @@ def board_line(content, w=64):
 
 
 def render_board(from_name, to_name, rows, now, animate=False):
-    W = 64
+    W = 52
 
     def sep():
-        print(board_line(f"{DM}{'─' * W}{RS}{BG}"))
+        print(board_line(f"{DM}{'─' * W}{RS}{BG}", W))
 
     if animate:
         sys.stdout.write(HIDE_CUR)
         sys.stdout.flush()
 
     sep()
-    print(board_line(""))
-    print(board_line(f"  {BD}{WH}  {from_name.upper()}{RS}{BG}"))
-    print(board_line(f"  {DM}  Departures to {to_name}  ·  {now}{RS}{BG}"))
-    print(board_line(""))
+    print(board_line("", W))
+    print(board_line(f"  {BD}{WH}{from_name.upper()} → {to_name.upper()}{RS}{BG}", W))
+    print(board_line(f"  {DM}{now}{RS}{BG}", W))
+    print(board_line("", W))
     sep()
-    print(board_line(f"  {DM}Time     Plat   Destination                   Expected{RS}{BG}"))
+    print(board_line(f"  {DM}DEP    ARR    MINS  TYPE{RS}{BG}", W))
     sep()
 
     if not rows:
-        print(board_line(""))
-        print(board_line(f"  {DM}  No services currently shown{RS}{BG}"))
-        print(board_line(""))
+        print(board_line("", W))
+        print(board_line(f"  {DM}No services currently shown{RS}{BG}", W))
+        print(board_line("", W))
     else:
         for i, r in enumerate(rows):
-            status_col = {
-                "ok": GR, "bad": RD, "neutral": AM
-            }.get(r["status_type"], AM)
+            mins_s = f"{r['mins']:>2}" if r["mins"] else " ?"
 
-            time_s = f"{AM}{BD}{r['std']}{RS}{BG}"
-            plat_s = f"{WH}{r['plat']:>2}{RS}{BG}" if r["plat"] else f"{DM} -{RS}{BG}"
-            dest_s = f"{WH}{to_name}{RS}{BG}"
-            if r["arr"]:
-                dest_s += f" {DM}({r['arr']}){RS}{BG}"
-            stat_s = f"{status_col}{r['status']}{RS}{BG}"
+            # Route type: fast gets amber ⚡, semi gets dim "via X", stopping is unmarked
+            if r["route_type"] == "fast":
+                type_s = f"{AM}{BD}⚡ fast{RS}{BG}"
+                type_plain = "⚡ fast"
+            elif r["route_type"] == "semi":
+                via = r["calling"][0] if r["calling"] else ""
+                # Shorten common station names
+                via = via.replace(" Junction", " Jn")
+                type_s = f"{DM}via {via}{RS}{BG}"
+                type_plain = f"via {via}"
+            else:
+                type_s = f"{DM}stopping{RS}{BG}"
+                type_plain = "stopping"
 
-            main = f"  {time_s}     {plat_s}     {dest_s}"
-            vis = vlen(main)
-            pad = max(0, 52 - vis)
-            main += " " * pad + stat_s
+            # Platform: only show if assigned
+            plat_s = ""
+            plat_plain = ""
+            if r["plat"]:
+                plat_s = f"  {DM}plat {WH}{r['plat']}{RS}{BG}"
+                plat_plain = f"  plat {r['plat']}"
+
+            # Status: only show if NOT on time
+            stat_s = ""
+            stat_plain = ""
+            if r["status_type"] == "bad":
+                stat_s = f"  {RD}{r['status']}{RS}{BG}"
+                stat_plain = f"  {r['status']}"
+
+            # Build the row
+            main = f"  {AM}{BD}{r['std']}{RS}{BG}   {WH}{r['arr']}{RS}{BG}    {DM}{mins_s}{RS}{BG}   {type_s}{plat_s}{stat_s}"
+            main_plain = f"  {r['std']}   {r['arr']}    {mins_s}   {type_plain}{plat_plain}{stat_plain}"
 
             if animate:
-                target = re.sub(r'\033\[[0-9;]*m', '', main)
-                flip_row(target, main, W)
+                flip_row(main_plain, main, W)
                 time.sleep(0.08)
             else:
-                print(board_line(main))
-
-            if r["calling"] and len(r["calling"]) <= 4:
-                stops = ", ".join(r["calling"])
-                print(board_line(f"           {DM}Calling at: {stops}{RS}{BG}"))
+                print(board_line(main, W))
 
     sep()
-    print(board_line(""))
+    print(board_line("", W))
 
     cancelled_n = sum(1 for r in rows if r["status_type"] == "bad")
     if cancelled_n:
-        print(board_line(f"  {RD}  ▲ {cancelled_n} service(s) disrupted on this route{RS}{BG}"))
+        print(board_line(f"  {RD}▲ {cancelled_n} service(s) disrupted{RS}{BG}", W))
     elif not rows:
-        print(board_line(f"  {DM}  No information available{RS}{BG}"))
+        print(board_line(f"  {DM}No information available{RS}{BG}", W))
     else:
-        print(board_line(f"  {GR}  ● Good service on this route{RS}{BG}"))
+        print(board_line(f"  {GR}● Good service{RS}{BG}", W))
 
-    print(board_line(""))
+    print(board_line("", W))
     sep()
 
     if animate:
@@ -275,6 +311,8 @@ def main():
     theme = "board"
     animate = False
     dest_crs = None
+    sort_by = "depart"
+    filter_type = None
 
     i = 0
     while i < len(args):
@@ -284,6 +322,21 @@ def main():
         elif args[i] == "--animate":
             animate = True
             i += 1
+        elif args[i] == "--sort" and i + 1 < len(args):
+            sort_by = args[i + 1]  # "depart" or "arrive"
+            i += 2
+        elif args[i] == "--fast":
+            filter_type = "fast"
+            i += 1
+        elif args[i] == "--semi":
+            filter_type = "semi"
+            i += 1
+        elif args[i] == "--stopping":
+            filter_type = "stopping"
+            i += 1
+        elif args[i] == "--filter" and i + 1 < len(args):
+            filter_type = args[i + 1]
+            i += 2
         elif dest_crs is None:
             dest_crs = args[i]
             i += 1
@@ -291,7 +344,7 @@ def main():
             i += 1
 
     if not dest_crs:
-        print("Usage: curl -s '...' | departures.py DEST_CRS [--theme board|clean] [--animate]")
+        print("Usage: curl -s '...' | departures.py DEST_CRS [--theme board|clean] [--animate] [--sort depart|arrive] [--fast|--semi|--stopping]")
         sys.exit(1)
 
     try:
@@ -307,6 +360,14 @@ def main():
 
     # Quietly log platform observations
     log_platforms(from_name, dest_crs, rows)
+
+    # Filter by route type
+    if filter_type:
+        rows = [r for r in rows if r["route_type"] == filter_type]
+
+    # Sort by arrival time if requested
+    if sort_by == "arrive":
+        rows.sort(key=lambda r: r["arr"] or "99:99")
 
     if theme == "clean":
         render_clean(from_name, to_name, rows, now)

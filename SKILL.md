@@ -17,9 +17,20 @@ Read config on every invocation. If missing, run setup flow.
 ```json
 {
   "home": {"name": "Leighton Buzzard", "crs": "LBZ"},
-  "work": {"name": "London Euston", "crs": "EUS"}
+  "work": {"name": "London Euston", "crs": "EUS"},
+  "theme": "board",
+  "sort": "depart",
+  "filter": null
 }
 ```
+
+| Config key | Values | Default | Purpose |
+|------------|--------|---------|---------|
+| `theme` | `board`, `clean` | `board` | Display theme |
+| `sort` | `depart`, `arrive` | `depart` | Sort trains by departure or arrival time |
+| `filter` | `null`, `fast`, `semi`, `stopping` | `null` | Only show trains of this type |
+
+Pass as CLI flags too: `--sort arrive`, `--fast`, `--semi`, `--stopping`
 
 ## API Reference
 
