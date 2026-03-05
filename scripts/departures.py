@@ -6,6 +6,7 @@ import sys
 import re
 import time
 import random
+import os
 from datetime import datetime
 
 # ── ANSI codes ──────────────────────────────────────────────────
@@ -166,10 +167,10 @@ def render_board(from_name, to_name, rows, now, animate=False):
             pad = max(0, 52 - vis)
             main += " " * pad + stat_s
 
-            if animate and i < 3:
-                # Flip animation for first 3 rows
+            if animate:
                 target = re.sub(r'\033\[[0-9;]*m', '', main)
                 flip_row(target, main, W)
+                time.sleep(0.08)
             else:
                 print(board_line(main))
 
@@ -224,6 +225,47 @@ def flip_row(target_plain, final_ansi, w):
     sys.stdout.flush()
 
 
+# ── PLATFORM LOGGING ───────────────────────────────────────────
+
+PLATFORM_LOG = os.path.expanduser("~/.claude/trains/platforms.json")
+
+
+def log_platforms(from_station, dest_crs, rows):
+    """Silently log platform assignments for future 'usually plat X' hints."""
+    try:
+        if os.path.exists(PLATFORM_LOG):
+            with open(PLATFORM_LOG) as f:
+                log = json.load(f)
+        else:
+            log = {}
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        day_of_week = datetime.now().strftime("%a")  # Mon, Tue, etc.
+
+        for r in rows:
+            if not r["plat"]:
+                continue
+            # Key: "EUS>LBZ:14:56" (route + scheduled time)
+            key = f"{from_station}>{dest_crs}:{r['std']}"
+            if key not in log:
+                log[key] = []
+            # Avoid duplicate entries for same day
+            if not any(e["date"] == today for e in log[key]):
+                log[key].append({
+                    "date": today,
+                    "day": day_of_week,
+                    "plat": r["plat"],
+                })
+            # Keep last 30 observations per train
+            log[key] = log[key][-30:]
+
+        os.makedirs(os.path.dirname(PLATFORM_LOG), exist_ok=True)
+        with open(PLATFORM_LOG, "w") as f:
+            json.dump(log, f, indent=2)
+    except Exception:
+        pass  # Never let logging break the display
+
+
 # ── MAIN ────────────────────────────────────────────────────────
 
 def main():
@@ -262,6 +304,9 @@ def main():
     to_name = data.get("filterLocationName", "?")
     now = datetime.now().strftime("%H:%M")
     rows = parse_services(data, dest_crs)
+
+    # Quietly log platform observations
+    log_platforms(from_name, dest_crs, rows)
 
     if theme == "clean":
         render_clean(from_name, to_name, rows, now)
