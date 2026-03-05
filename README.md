@@ -6,11 +6,15 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that check
 
 ## What it does
 
-- **Live departures** — shows the next trains between your two stations with platform, arrival time, and delay status
+- **Live departures** — minimal board showing departure, arrival, journey time, and route type (fast/semi/stopping)
+- **Split-flap animation** — pops up a Terminal.app window with an animated departures board
 - **Disruption alerts** — checks for delays and cancellations on your route
 - **Calendar integration** — adds a specific train to Apple Calendar via `.ics` export
-- **Baseline timetable** — caches your route's schedule for offline reference
+- **Status line countdown** — shows a countdown chip in your Claude Code status line when your train is approaching
+- **Filters and sorting** — show only fast/semi/stopping trains, sort by departure or arrival time
+- **Platform logging** — silently tracks platform assignments over time for future "usually plat X" hints
 - **Smart direction** — auto-detects home→work (morning) or work→home (afternoon)
+- **Baseline timetable** — caches your route's schedule for offline reference
 
 ## Install
 
@@ -39,8 +43,8 @@ Run `/trains setup` in Claude Code. It will ask for your two station names, vali
 | `/trains to work` | Force home→work direction |
 | `/trains to home` | Force work→home direction |
 | `/trains disruptions` | Check for delays/cancellations both directions |
-| `/trains add 08:15` | Add the 08:15 departure to Apple Calendar |
-| `/trains add next` | Add the next departure to Apple Calendar |
+| `/trains add 08:15` | Add the 08:15 departure to Apple Calendar + start countdown |
+| `/trains add next` | Add the next departure to Apple Calendar + start countdown |
 | `/trains timetable` | Show cached baseline schedule |
 | `/trains refresh` | Re-capture baseline timetable |
 | `/trains setup` | Reconfigure stations |
@@ -52,9 +56,20 @@ The skill uses the [Huxley2 community instance](https://national-rail-api.davwhe
 When you run `/trains`, Claude:
 1. Reads your station config from `~/.claude/trains/config.json`
 2. Fetches live departures via `curl`
-3. Renders a departure board inline in the conversation
+3. Opens an animated departures board in a Terminal.app window (split-flap effect)
+4. Renders a compact inline summary in the conversation
 
-The board shows departure time, platform, arrival time, service type (fast/semi-fast/all stations), and delay status.
+The board shows departure time, arrival time, journey minutes, and route type — with fast trains highlighted in amber. Delays and cancellations are flagged; on-time services stay clean.
+
+### Status line countdown
+
+When you `/trains add` a train, the skill saves it to `~/.claude/trains/next.json`. If you have the [status line integration](#status-line-integration) set up, a countdown chip appears:
+
+- Slate pill `⚡ 45m` — plenty of time
+- Amber pill `🚂 18m` — getting close
+- Red pill `⚡ 3m` — time to go
+
+The chip auto-clears after the train departs. Fast trains show ⚡, others show 🚂.
 
 ## Config
 
@@ -63,11 +78,22 @@ Stored at `~/.claude/trains/config.json`:
 ```json
 {
   "home": {"name": "Leighton Buzzard", "crs": "LBZ"},
-  "work": {"name": "London Euston", "crs": "EUS"}
+  "work": {"name": "London Euston", "crs": "EUS"},
+  "theme": "board",
+  "sort": "depart",
+  "filter": null,
+  "countdown_mins": 60
 }
 ```
 
-Station names are validated against the API. CRS codes (3-letter station codes) are stored for reliable lookups.
+| Option | Values | Default | Purpose |
+|--------|--------|---------|---------|
+| `theme` | `board`, `clean` | `board` | Display theme (`board` opens Terminal.app with animation) |
+| `sort` | `depart`, `arrive` | `depart` | Sort trains by departure or arrival time |
+| `filter` | `null`, `fast`, `semi`, `stopping` | `null` | Only show trains of this type |
+| `countdown_mins` | integer | `60` | Show status line countdown when train is within this many minutes |
+
+Filters and sort can also be passed as CLI flags: `--fast`, `--semi`, `--stopping`, `--sort arrive`.
 
 ## Standalone terminal use
 
@@ -75,17 +101,41 @@ The `scripts/departures.py` script also works standalone with ANSI-coloured outp
 
 ```bash
 curl -s "https://national-rail-api.davwheat.dev/departures/EUS/to/LBZ?expand=true" \
-  | python3 scripts/departures.py LBZ --theme board
+  | python3 scripts/departures.py LBZ --theme board --animate
 ```
 
-Themes: `board` (amber departures board) or `clean` (minimal box-drawing). Add `--animate` for a split-flap effect.
+Themes: `board` (amber departures board) or `clean` (minimal box-drawing). Add `--animate` for the split-flap effect. Filter with `--fast`, `--semi`, or `--stopping`.
+
+## Status line integration
+
+To show the train countdown in your Claude Code status line, add this to your status line script (`~/.claude/statusline-command.sh`):
+
+```bash
+# Read next train countdown
+next_train="$HOME/.claude/trains/next.json"
+if [[ -f "$next_train" ]]; then
+  train_dep=$(jq -r '.depart // empty' "$next_train" 2>/dev/null)
+  train_date=$(jq -r '.date // empty' "$next_train" 2>/dev/null)
+  if [[ -n "$train_dep" && -n "$train_date" ]]; then
+    now_epoch=$(date +%s)
+    dep_epoch=$(date -j -f "%Y-%m-%d %H:%M" "$train_date $train_dep" +%s 2>/dev/null)
+    diff_mins=$(( (dep_epoch - now_epoch) / 60 ))
+    if (( diff_mins < 0 )); then
+      echo '{}' > "$next_train"  # departed, clear it
+    elif (( diff_mins <= 60 )); then
+      echo "🚂 ${diff_mins}m"   # show countdown
+    fi
+  fi
+fi
+```
 
 ## Requirements
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (for the skill)
 - Python 3 (for the display script)
 - `curl` (for API calls)
-- macOS (for Apple Calendar `.ics` integration — the core departures work anywhere)
+- `jq` (for status line countdown)
+- macOS (for Terminal.app animation and Apple Calendar `.ics` integration)
 
 ## API
 
