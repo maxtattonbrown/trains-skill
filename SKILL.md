@@ -20,7 +20,8 @@ Read config on every invocation. If missing, run setup flow.
   "work": {"name": "London Euston", "crs": "EUS"},
   "theme": "board",
   "sort": "depart",
-  "filter": null
+  "filter": null,
+  "countdown_mins": 60
 }
 ```
 
@@ -29,6 +30,7 @@ Read config on every invocation. If missing, run setup flow.
 | `theme` | `board`, `clean` | `board` | Display theme |
 | `sort` | `depart`, `arrive` | `depart` | Sort trains by departure or arrival time |
 | `filter` | `null`, `fast`, `semi`, `stopping` | `null` | Only show trains of this type |
+| `countdown_mins` | integer | `60` | Show countdown in status line when train is within this many minutes |
 
 Pass as CLI flags too: `--sort arrive`, `--fast`, `--semi`, `--stopping`
 
@@ -153,6 +155,19 @@ Based on number of intermediate stops:
    END:VCALENDAR
    ```
 3. `open /tmp/train-{date}-{time}.ics` — imports to Apple Calendar
+4. Write `~/.claude/trains/next.json` for status line countdown:
+   ```json
+   {
+     "date": "2026-03-05",
+     "depart": "16:26",
+     "arrive": "16:55",
+     "from": "London Euston",
+     "to": "Leighton Buzzard",
+     "route_type": "fast",
+     "plat": "7"
+   }
+   ```
+   The status line script reads this and shows a countdown chip when within `countdown_mins` of departure. Auto-clears after the train departs.
 
 ### `/trains timetable`
 
