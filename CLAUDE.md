@@ -1,15 +1,15 @@
-# trAIns — Claude Code Skill for UK Train Times
+# Train Tracks — Claude Code Skill for UK Train Times
 
 ## Overview
 
 A Claude Code skill (`/trains`) that checks live UK train departures between two configurable stations. Uses the free Huxley2 API (National Rail Darwin proxy). No API key needed.
 
-GitHub: `maxtattonbrown/trains-skill`
+GitHub: `maxtattonbrown/train-tracks`
 
 ## Architecture
 
 ```
-trains-skill/              ← GitHub repo (also submodule in MTBvault/Projects/)
+train-tracks/              ← GitHub repo (also submodule in MTBvault/Projects/)
 ├── SKILL.md               ← Skill definition (loaded by Claude Code)
 ├── scripts/departures.py  ← TUI display script (ANSI board + split-flap animation)
 ├── README.md              ← Public README

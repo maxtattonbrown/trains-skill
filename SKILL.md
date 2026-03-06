@@ -1,11 +1,11 @@
 ---
 name: trains
-description: Check UK train commute times, disruptions, and add trains to Apple Calendar. Uses the Huxley2 API (National Rail Darwin proxy). Supports live departures, delay checking, baseline timetable caching, and .ics calendar export. Trigger on '/trains', or when user mentions train times, commute, or checking departures. Examples - '/trains' shows next departures, '/trains disruptions' checks for delays, '/trains add 08:15' adds a train to calendar, '/trains setup' configures stations.
+description: "Train Tracks: Check UK train commute times, disruptions, and add trains to Apple Calendar. Uses the Huxley2 API (National Rail Darwin proxy). Supports live departures, delay checking, baseline timetable caching, and .ics calendar export. Trigger on '/trains', or when user mentions train times, commute, or checking departures. Examples - '/trains' shows next departures, '/trains disruptions' checks for delays, '/trains add 08:15' adds a train to calendar, '/trains setup' configures stations."
 ---
 
-# trAIns — Commute Tracker
+# Train Tracks — Commute Tracker
 
-Check live UK train departures, disruptions, and add trAIns to Apple Calendar.
+Check live UK train departures, disruptions, and add trains to Apple Calendar.
 
 ## Config
 

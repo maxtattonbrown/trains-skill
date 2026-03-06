@@ -1,6 +1,6 @@
-# /trAIns — A Claude Code Skill for UK Train Times
+# Train Tracks — A Claude Code Skill for UK Train Times
 
-A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that checks live UK train departures, warns about disruptions, and adds trAIns to your Apple Calendar. Built on the free [Huxley2](https://github.com/jpsingleton/Huxley2) API (a JSON proxy for National Rail's Darwin system).
+A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that checks live UK train departures, warns about disruptions, and adds trains to your Apple Calendar. Built on the free [Huxley2](https://github.com/jpsingleton/Huxley2) API (a JSON proxy for National Rail's Darwin system).
 
 ![Departures board animation](demo.gif)
 
@@ -27,8 +27,8 @@ cp -r . ~/.claude/skills/trains/
 Or clone and symlink:
 
 ```bash
-git clone https://github.com/maxtattonbrown/trains-skill.git
-ln -s "$(pwd)/trains-skill" ~/.claude/skills/trains
+git clone https://github.com/maxtattonbrown/train-tracks.git
+ln -s "$(pwd)/train-tracks" ~/.claude/skills/trains
 ```
 
 ## Setup
