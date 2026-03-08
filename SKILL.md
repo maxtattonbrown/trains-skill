@@ -18,7 +18,7 @@ Read config on every invocation. If missing, run setup flow.
 {
   "home": {"name": "Leighton Buzzard", "crs": "LBZ"},
   "work": {"name": "London Euston", "crs": "EUS"},
-  "theme": "board",
+  "theme": "fast",
   "sort": "depart",
   "filter": null,
   "countdown_mins": 60
@@ -27,12 +27,12 @@ Read config on every invocation. If missing, run setup flow.
 
 | Config key | Values | Default | Purpose |
 |------------|--------|---------|---------|
-| `theme` | `board`, `clean` | `board` | Display theme |
+| `theme` | `fast`, `board`, `clean` | `fast` | Display theme |
 | `sort` | `depart`, `arrive` | `depart` | Sort trains by departure or arrival time |
 | `filter` | `null`, `fast`, `semi`, `stopping` | `null` | Only show trains of this type |
 | `countdown_mins` | integer | `60` | Show countdown in status line when train is within this many minutes |
 
-Pass as CLI flags too: `--sort arrive`, `--fast`, `--semi`, `--stopping`
+Pass as CLI flags too: `--sort arrive`, `--fast`, `--semi`, `--stopping`, `--board`
 
 ## API Reference
 
@@ -108,17 +108,17 @@ Based on number of intermediate stops:
 1. Read config
 2. Direction: before 12:00 → home-to-work, after → work-to-home
    - Override: `/trains to work`, `/trains to home`
-3. If theme is `board`: open an animated departures board in a Terminal.app window using:
-   ```bash
-   osascript -e 'tell application "Terminal" to do script "curl -s \"https://national-rail-api.davwheat.dev/departures/{from}/to/{to}?expand=true\" | python3 ~/.claude/skills/trains/scripts/departures.py {DEST_CRS} --theme board --animate; echo; echo \"Press any key to close\"; read -n1; exit"'
+3. If theme is `fast` (default): fetch data and render a compact inline summary only. No Terminal popup. Example:
    ```
-   This pops up a real terminal with the split-flap animation. The window stays open so the user can read it while continuing to work in Claude Code.
-4. Also render a compact inline summary in the conversation (markdown text, not the full board) so the user has the data in context too. Example:
-   ```
-   Trains: Euston → Leighton Buzzard (opened in Terminal)
+   Trains: Euston → Leighton Buzzard
    Next: 14:56 (⚡ fast, plat 12) · 15:09 (all stations) · 15:23 (via Watford Jn)
    ● Good service
    ```
+4. If theme is `board` (or user passes `--board`): open an animated departures board in a Terminal.app window using:
+   ```bash
+   osascript -e 'tell application "Terminal" to activate' && osascript -e 'tell application "Terminal" to do script "curl -s \"https://national-rail-api.davwheat.dev/departures/{from}/to/{to}?expand=true\" | python3 ~/.claude/skills/trains/scripts/departures.py {DEST_CRS} --theme board --animate; echo; echo \"Press any key to close\"; read -n1; exit"'
+   ```
+   Also render the compact inline summary in the conversation.
 5. If theme is `clean`: render the box-drawing board as inline markdown text (no Terminal popup)
 6. Fallback to baseline timetable if API unreachable
 

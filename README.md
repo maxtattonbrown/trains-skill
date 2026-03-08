@@ -79,7 +79,7 @@ Stored at `~/.claude/trains/config.json`:
 {
   "home": {"name": "Leighton Buzzard", "crs": "LBZ"},
   "work": {"name": "London Euston", "crs": "EUS"},
-  "theme": "board",
+  "theme": "fast",
   "sort": "depart",
   "filter": null,
   "countdown_mins": 60
@@ -88,12 +88,12 @@ Stored at `~/.claude/trains/config.json`:
 
 | Option | Values | Default | Purpose |
 |--------|--------|---------|---------|
-| `theme` | `board`, `clean` | `board` | Display theme (`board` opens Terminal.app with animation) |
+| `theme` | `fast`, `board`, `clean` | `fast` | Display theme (`fast` = inline only, `board` opens Terminal.app with animation) |
 | `sort` | `depart`, `arrive` | `depart` | Sort trains by departure or arrival time |
 | `filter` | `null`, `fast`, `semi`, `stopping` | `null` | Only show trains of this type |
 | `countdown_mins` | integer | `60` | Show status line countdown when train is within this many minutes |
 
-Filters and sort can also be passed as CLI flags: `--fast`, `--semi`, `--stopping`, `--sort arrive`.
+Filters, sort, and theme can also be passed as CLI flags: `--fast`, `--semi`, `--stopping`, `--sort arrive`, `--board`.
 
 ## Standalone terminal use
 
