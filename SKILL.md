@@ -1,6 +1,6 @@
 ---
 name: trains
-description: "Train Tracks: Check UK train commute times, disruptions, and add trains to Apple Calendar. Uses the Huxley2 API (National Rail Darwin proxy). Supports live departures, delay checking, baseline timetable caching, and .ics calendar export. Trigger on '/trains', or when user mentions train times, commute, or checking departures. Examples - '/trains' shows next departures, '/trains disruptions' checks for delays, '/trains add 08:15' adds a train to calendar, '/trains setup' configures stations."
+description: "Train Tracks: Check UK train commute times, disruptions, and add trains to Fantastical (or Apple Calendar if Fantastical not installed). Uses the Huxley2 API (National Rail Darwin proxy). Supports live departures, delay checking, baseline timetable caching, and .ics calendar export. Trigger on '/trains', or when user mentions train times, commute, or checking departures. Examples - '/trains' shows next departures, '/trains disruptions' checks for delays, '/trains add 08:15' adds a train to calendar, '/trains setup' configures stations."
 ---
 
 # Train Tracks — Commute Tracker
@@ -101,6 +101,18 @@ Based on number of intermediate stops:
 - Cancelled → `✗ CANCELLED`
 - Delayed (no estimate) → `✗ Delayed`
 
+## Auto-refresh
+
+Before using the timetable cache, check if it's stale. If ANY of these are true, refresh silently before answering:
+
+1. **Age**: `captured` date in timetable.json is more than 7 days ago
+2. **Day-type mismatch**: `day_type` is "sunday" but today is a weekday (or vice versa)
+3. **Empty/missing**: timetable.json doesn't exist or has no services
+
+**Refresh process:** Run the `/trains refresh` flow (query API at multiple time offsets, save to timetable.json). Then proceed with the fresh data. Don't ask — just do it. Mention briefly: "Refreshed timetable (was stale)."
+
+This does NOT apply when live API data is available (i.e., querying today's departures). Live always takes priority; the timetable is only a fallback for future dates or when the API is down.
+
 ## Modes
 
 ### `/trains` or `/trains next`
@@ -140,7 +152,23 @@ Based on number of intermediate stops:
 ### `/trains add {time}` or `/trains add next` or `/trains add`
 
 1. If no time specified, fetch departures and present an **AskUserQuestion** prompt with the top 3-4 options (prioritise fast trains). If a time is given, match by departure time. If `next`, use first upcoming.
-2. Write `.ics` to `/tmp/train-{date}-{time}.ics`:
+2. Add the event to the calendar — use whichever method is available:
+
+   **A) Fantastical MCP (preferred — use if `mcp__Fantastical__createCalendarItem` is available):**
+   - Tool: `mcp__Fantastical__createCalendarItem`
+   - `calendarId`: call `mcp__Fantastical__queryCalendars` first to find a trains/commute calendar; if none exists, omit and let Fantastical use the default
+   - `description`: compact natural language, e.g. `"Train Leighton Buzzard to London Euston 10:47 arriving 11:17 platform 4 on 14 April 2026"`
+   - `type`: `"event"`
+
+   **B) .ics fallback (if Fantastical MCP is not available):**
+   Write `/tmp/train-{date}-{time}.ics`, then:
+   ```bash
+   if [ -d "/Applications/Fantastical.app" ]; then
+     open -a Fantastical /tmp/train-{date}-{time}.ics
+   else
+     open /tmp/train-{date}-{time}.ics
+   fi
+   ```
    ```
    BEGIN:VCALENDAR
    VERSION:2.0
@@ -154,8 +182,8 @@ Based on number of intermediate stops:
    END:VEVENT
    END:VCALENDAR
    ```
-3. `open /tmp/train-{date}-{time}.ics` — imports to Apple Calendar
-4. Write `~/.claude/trains/next.json` for status line countdown:
+
+3. Write `~/.claude/trains/next.json` for status line countdown:
    ```json
    {
      "date": "2026-03-05",
@@ -196,3 +224,12 @@ Delays: `delayedTrains[]`, `totalTrainsDelayed`, `delays` boolean.
 - API unreachable → fall back to baseline + warn
 - No services → suggest `/trains disruptions`
 - Bad station name → suggest CRS code
+
+## Gotchas
+
+- **Rendering in Bash is the #1 failure mode.** Despite the CRITICAL section above, Claude still defaults to rendering the departures board inside a Bash tool call. The board then collapses behind "click to expand" and defeats the purpose. Always: fetch data with Bash, render the board as markdown text in your response.
+- **The API proxy can go down without warning.** The davwheat Huxley2 proxy is a community project, not an official National Rail service. When it's down, fall back to timetable cache — but if the cache is empty (never refreshed), there's nothing to show. Suggest `/trains refresh` when the cache is empty and the API is healthy.
+- **Direction auto-detect is crude.** Before noon = home→work, after noon = work→home. This is wrong on WFH days, weekends, or unusual schedules. If the direction seems wrong for context, ask rather than assuming.
+- **Fantastical MCP is the preferred calendar method when available.** Check for `mcp__Fantastical__createCalendarItem` in the session's available tools — if present, use it. First call `queryCalendars` to find a dedicated trains/commute calendar; fall back to default calendar if none exists. Fall back to .ics export only when the MCP is not connected. The official binary lives at `~/Library/Application Support/Claude/Claude Extensions/ant.dir.gh.flexibits.fantastical-mcp/`.
+- **Fantastical is preferred over Apple Calendar when installed.** Always check for `/Applications/Fantastical.app` before opening .ics files. Use `open -a Fantastical` — do not rely on default file association, which may still point to Apple Calendar even when Fantastical is installed.
+- **The .ics export lacks VTIMEZONE.** Generally fine for UK local time, but could produce wrong calendar entries around DST transitions (last Sunday of March/October). If adding a train near a clock change, double-check the times.
